@@ -29,9 +29,13 @@ website: https://github.com/charliermarsh/ruff
 
 parts:
   rust-deps:
+    # We need to do this rather than use cargo from apt because we require
+    # a newer rust.
     plugin: nil
     build-packages:
-      - cargo
+      - curl
+    override-pull: |
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
   ruff:
     plugin: rust
     after:
