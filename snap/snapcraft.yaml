@@ -1,6 +1,8 @@
 name: ruff
 version: git
 summary: An extremely fast Python linter, written in Rust.
+# noinspection YAMLSchemaValidation
+# https://youtrack.jetbrains.com/issue/PY-58754
 description: |
   Ruff aims to be orders of magnitude faster than alternative tools while integrating more
   functionality behind a single, common interface.
@@ -26,6 +28,21 @@ issues:
   - https://github.com/charliermarsh/ruff/issues
 source-code: https://github.com/lengau/ruff
 website: https://github.com/charliermarsh/ruff
+architectures:
+# The dependency `ring` doesn't support building on ppc64el or s390x. However, ruff supports building for those platforms from amd64
+# https://github.com/charliermarsh/ruff/blob/7a83b65fbeed85a51975fc31d3c292ff192fb2ef/.github/workflows/ruff.yaml#L128
+  - build-on: [ amd64, i386, arm64, armhf ]
+    build-for: amd64
+  - build-on: [ amd64, i386, arm64, armhf ]
+    build-for: i386
+  - build-on: [ amd64, i386, arm64, armhf ]
+    build-for: arm64
+  - build-on: [ amd64, i386, arm64, armhf ]
+    build-for: armhf
+  - build-on: [ amd64 ]
+    build-for: s390x
+  - build-on: [ amd64 ]
+    build-for: ppc64el
 
 parts:
   rust-deps:
