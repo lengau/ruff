@@ -45,8 +45,42 @@ architectures:
     build-for: ppc64el
 
 parts:
+  rust-deps:
+    plugin: nil
+    source: .
+    build-packages:
+      - curl
+    override-build: |
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-init
+      chmod +x rustup-init
+      ./rustup-init -y --no-modify-path --profile=minimal
+      export PATH=$HOME/.cargo/bin:$PATH
+      case "${CRAFT_TARGET_ARCH}" in
+      amd64)
+        export CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
+        ;;
+      i386)
+        export CARGO_BUILD_TARGET=i686-unknown-linux-gnu
+        ;;
+      arm64)
+        export CARGO_BUILD_TARGET=aarch64-unknown-linux-gnu
+        ;;
+      armhf)
+        export CARGO_BUILD_TARGET=armv7-unknown-linux-gnueabihf
+        ;;
+      s390x)
+        export CARGO_BUILD_TARGET=s390x-unknown-linux-gnu
+        ;;
+      ppc64el)
+        export CARGO_BUILD_TARGET=powerpc64le-unknown-linux-gnu
+        ;;
+      esac
+      rustup toolchain install $(cat rust-toolchain)-$CARGO_BUILD_TARGET
+
   ruff:
     plugin: rust
+    after:
+      - rust-deps
     source: .
     # The rust plugin doesn't currently support multiple paths.
     # Before we can actually do this, either the plugin updates or we need to make
@@ -56,11 +90,10 @@ parts:
       - flake8_to_ruff
     build-environment:
       - CARGO_INSTALL_ROOT: "${CRAFT_PART_INSTALL}"
-      - CARGO_BUILD_JOBS: "${SNAPCRAFT_PARALLEL_BUILD_COUNT}"
+      - CARGO_BUILD_JOBS: "${CRAFT_PARALLEL_BUILD_COUNT}"
     # The rust plugin currently does not support cross-compiling.
     # Until it does, we're overriding the build steps and doing it ourselves.
     override-build: |
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile=minimal
       export PATH=$HOME/.cargo/bin:$PATH
       case "${CRAFT_TARGET_ARCH}" in
       amd64)
