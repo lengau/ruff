@@ -45,28 +45,44 @@ architectures:
     build-for: ppc64el
 
 parts:
-  rust-deps:
-    # We need to do this rather than use cargo from apt because we require
-    # a newer rust.
-    plugin: nil
-    build-packages:
-      - curl
-    override-pull: |
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
   ruff:
     plugin: rust
-    after:
-      - rust-deps
     source: .
+    # The rust plugin doesn't currently support multiple paths.
+    # Before we can actually do this, either the plugin updates or we need to make
+    # two parts. For now though we're overriding the build steps anyway.
     rust-path:
       - ruff_cli
-  flake8-to-ruff:
-    plugin: rust
-    after:
-      - rust-deps
-    source: .
-    rust-path:
       - flake8_to_ruff
+    build-environment:
+      - CARGO_INSTALL_ROOT: "${CRAFT_PART_INSTALL}"
+      - CARGO_BUILD_JOBS: "${SNAPCRAFT_PARALLEL_BUILD_COUNT}"
+    # The rust plugin currently does not support cross-compiling.
+    # Until it does, we're overriding the build steps and doing it ourselves.
+    override-build: |
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile=minimal
+      case "${CRAFT_TARGET_ARCH}" in
+      amd64)
+        export CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
+        ;;
+      i386)
+        export CARGO_BUILD_TARGET=i686-unknown-linux-gnu
+        ;;
+      arm64)
+        export CARGO_BUILD_TARGET=aarch64-unknown-linux-gnu
+        ;;
+      armhf)
+        export CARGO_BUILD_TARGET=armv7-unknown-linux-gnueabihf
+        ;;
+      s390x)
+        export CARGO_BUILD_TARGET=s390x-unknown-linux-gnu
+        ;;
+      ppc64el)
+        export CARGO_BUILD_TARGET=powerpc64le-unknown-linux-gnu
+        ;;
+      esac
+      cargo install --locked --no-default-features --path ruff_cli
+      cargo install --locked --path flake8_to_ruff
 
 apps:
   ruff:
