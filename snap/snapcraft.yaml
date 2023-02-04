@@ -75,7 +75,7 @@ parts:
         export CARGO_BUILD_TARGET=powerpc64le-unknown-linux-gnu
         ;;
       esac
-      rustup toolchain install $(cat rust-toolchain)-$CARGO_BUILD_TARGET
+      rustup target add $CARGO_BUILD_TARGET
 
   ruff:
     plugin: rust
