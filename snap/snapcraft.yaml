@@ -61,6 +61,7 @@ parts:
     # Until it does, we're overriding the build steps and doing it ourselves.
     override-build: |
       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile=minimal
+      export PATH=$HOME/.cargo/bin:$PATH
       case "${CRAFT_TARGET_ARCH}" in
       amd64)
         export CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
