@@ -15,16 +15,31 @@ SECTIONS: list[tuple[str, str]] = [
     ("FAQ", "faq.md"),
 ]
 
+DOCUMENTATION_LINK: str = (
+    "This README is also available as [documentation](https://beta.ruff.rs/docs/)."
+)
+
+FATHOM_SCRIPT: str = (
+    '<script src="https://cdn.usefathom.com/script.js" data-site="DUAEBFLB" defer>'
+    "</script>"
+)
+
 
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
 
+    # Remove the documentation link, since we're _in_ the docs.
+    if DOCUMENTATION_LINK not in content:
+        msg = "README.md is not in the expected format."
+        raise ValueError(msg)
+    content = content.replace(DOCUMENTATION_LINK, "")
+
     Path("docs").mkdir(parents=True, exist_ok=True)
 
     # Split the README.md into sections.
-    for (title, filename) in SECTIONS:
+    for title, filename in SECTIONS:
         with Path(f"docs/{filename}").open("w+") as f:
             block = content.split(f"<!-- Begin section: {title} -->")
             if len(block) != 2:
@@ -54,6 +69,11 @@ def main() -> None:
         {"FAQ": "faq.md"},
         {"Contributing": "contributing.md"},
     ]
+    config["extra"] = {"analytics": {"provider": "fathom"}}
+
+    Path(".overrides/partials/integrations/analytics").mkdir(parents=True, exist_ok=True)
+    with Path(".overrides/partials/integrations/analytics/fathom.html").open("w+") as fp:
+        fp.write(FATHOM_SCRIPT)
 
     with Path("mkdocs.yml").open("w+") as fp:
         yaml.safe_dump(config, fp)
