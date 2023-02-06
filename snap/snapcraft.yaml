@@ -28,95 +28,30 @@ issues:
   - https://github.com/charliermarsh/ruff/issues
 source-code: https://github.com/lengau/ruff
 website: https://github.com/charliermarsh/ruff
-architectures:
-# The dependency `ring` doesn't support building on ppc64el or s390x. However, ruff supports building for those platforms from amd64
-# https://github.com/charliermarsh/ruff/blob/7a83b65fbeed85a51975fc31d3c292ff192fb2ef/.github/workflows/ruff.yaml#L128
-  - build-on: [ amd64, i386, arm64, armhf ]
-    build-for: amd64
-  - build-on: [ amd64, i386, arm64, armhf ]
-    build-for: i386
-  - build-on: [ amd64, i386, arm64, armhf ]
-    build-for: arm64
-  - build-on: [ amd64, i386, arm64, armhf ]
-    build-for: armhf
-  - build-on: [ amd64 ]
-    build-for: s390x
-  - build-on: [ amd64 ]
-    build-for: ppc64el
 
 parts:
   rust-deps:
     plugin: nil
-    source: .
     build-packages:
       - curl
-    override-build: |
+    override-pull: |
       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o rustup-init
       chmod +x rustup-init
       ./rustup-init -y --no-modify-path --profile=minimal
-      export PATH=$HOME/.cargo/bin:$PATH
-      case "${CRAFT_TARGET_ARCH}" in
-      amd64)
-        export CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
-        ;;
-      i386)
-        export CARGO_BUILD_TARGET=i686-unknown-linux-gnu
-        ;;
-      arm64)
-        export CARGO_BUILD_TARGET=aarch64-unknown-linux-gnu
-        ;;
-      armhf)
-        export CARGO_BUILD_TARGET=armv7-unknown-linux-gnueabihf
-        ;;
-      s390x)
-        export CARGO_BUILD_TARGET=s390x-unknown-linux-gnu
-        ;;
-      ppc64el)
-        export CARGO_BUILD_TARGET=powerpc64le-unknown-linux-gnu
-        ;;
-      esac
-      rustup target add $CARGO_BUILD_TARGET
-
   ruff:
     plugin: rust
+    source: .
     after:
       - rust-deps
-    source: .
-    # The rust plugin doesn't currently support multiple paths.
-    # Before we can actually do this, either the plugin updates or we need to make
-    # two parts. For now though we're overriding the build steps anyway.
-    rust-path:
-      - ruff_cli
-      - flake8_to_ruff
     build-environment:
       - CARGO_INSTALL_ROOT: "${CRAFT_PART_INSTALL}"
       - CARGO_BUILD_JOBS: "${CRAFT_PARALLEL_BUILD_COUNT}"
-    # The rust plugin currently does not support cross-compiling.
-    # Until it does, we're overriding the build steps and doing it ourselves.
-    override-build: |
-      export PATH=$HOME/.cargo/bin:$PATH
-      case "${CRAFT_TARGET_ARCH}" in
-      amd64)
-        export CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
-        ;;
-      i386)
-        export CARGO_BUILD_TARGET=i686-unknown-linux-gnu
-        ;;
-      arm64)
-        export CARGO_BUILD_TARGET=aarch64-unknown-linux-gnu
-        ;;
-      armhf)
-        export CARGO_BUILD_TARGET=armv7-unknown-linux-gnueabihf
-        ;;
-      s390x)
-        export CARGO_BUILD_TARGET=s390x-unknown-linux-gnu
-        ;;
-      ppc64el)
-        export CARGO_BUILD_TARGET=powerpc64le-unknown-linux-gnu
-        ;;
-      esac
-      cargo install --locked --no-default-features --path ruff_cli
-      cargo install --locked --path flake8_to_ruff
+    rust-path:
+      - ruff_cli
+      - flake8_to_ruff
+    override-build: |  # Override because we need to specify no-default-features
+      cargo install --locked --path ruff_cli --force --no-default-features
+      cargo install --locked --path flake8_to_ruff --force --no-default-features
 
 apps:
   ruff:
