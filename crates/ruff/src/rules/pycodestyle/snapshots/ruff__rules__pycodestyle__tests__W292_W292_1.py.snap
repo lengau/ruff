@@ -1,6 +1,0 @@
----
-source: src/rules/pycodestyle/mod.rs
-expression: diagnostics
----
-[]
-

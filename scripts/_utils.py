@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from pathlib import Path
 
@@ -11,6 +13,13 @@ def dir_name(linter_name: str) -> str:
 def pascal_case(linter_name: str) -> str:
     """Convert from snake-case to PascalCase."""
     return "".join(word.title() for word in linter_name.split("-"))
+
+
+def snake_case(name: str) -> str:
+    """Convert from PascalCase to snake_case."""
+    return "".join(
+        f"_{word.lower()}" if word.isupper() else word for word in name
+    ).lstrip("_")
 
 
 def get_indent(line: str) -> str:

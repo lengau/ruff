@@ -1,10 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import Editor from "./Editor";
 import "./index.css";
+import Chrome from "./Editor/Chrome";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <Editor />
+    <Chrome />
   </React.StrictMode>,
 );

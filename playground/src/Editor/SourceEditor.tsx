@@ -2,9 +2,9 @@
  * Editor for the Python source code.
  */
 
-import Editor, { useMonaco } from "@monaco-editor/react";
+import Editor, { BeforeMount, Monaco } from "@monaco-editor/react";
 import { MarkerSeverity, MarkerTag } from "monaco-editor";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Diagnostic } from "../pkg";
 import { Theme } from "./theme";
 
@@ -21,7 +21,8 @@ export default function SourceEditor({
   theme: Theme;
   onChange: (pythonSource: string) => void;
 }) {
-  const monaco = useMonaco();
+  const monacoRef = useRef<Monaco | null>(null);
+  const monaco = monacoRef.current;
 
   useEffect(() => {
     const editor = monaco?.editor;
@@ -35,10 +36,12 @@ export default function SourceEditor({
       "owner",
       diagnostics.map((diagnostic) => ({
         startLineNumber: diagnostic.location.row,
-        startColumn: diagnostic.location.column + 1,
+        startColumn: diagnostic.location.column,
         endLineNumber: diagnostic.end_location.row,
-        endColumn: diagnostic.end_location.column + 1,
-        message: `${diagnostic.code}: ${diagnostic.message}`,
+        endColumn: diagnostic.end_location.column,
+        message: diagnostic.code
+          ? `${diagnostic.code}: ${diagnostic.message}`
+          : diagnostic.message,
         severity: MarkerSeverity.Error,
         tags:
           diagnostic.code === "F401" || diagnostic.code === "F841"
@@ -50,38 +53,40 @@ export default function SourceEditor({
     const codeActionProvider = monaco?.languages.registerCodeActionProvider(
       "python",
       {
-        // @ts-expect-error: The type definition is wrong.
         provideCodeActions: function (model, position) {
           const actions = diagnostics
             .filter((check) => position.startLineNumber === check.location.row)
-            .filter((check) => check.fix)
+            .filter(({ fix }) => fix)
             .map((check) => ({
               title: check.fix
-                ? `${check.code}: ${check.fix.message}` ?? `Fix ${check.code}`
-                : "Autofix",
+                ? check.fix.message
+                  ? `${check.code}: ${check.fix.message}`
+                  : `Fix ${check.code}`
+                : "Fix",
               id: `fix-${check.code}`,
               kind: "quickfix",
               edit: check.fix
                 ? {
-                    edits: [
-                      {
-                        resource: model.uri,
-                        versionId: model.getVersionId(),
-                        edit: {
-                          range: {
-                            startLineNumber: check.fix.location.row,
-                            startColumn: check.fix.location.column + 1,
-                            endLineNumber: check.fix.end_location.row,
-                            endColumn: check.fix.end_location.column + 1,
-                          },
-                          text: check.fix.content,
+                    edits: check.fix.edits.map((edit) => ({
+                      resource: model.uri,
+                      versionId: model.getVersionId(),
+                      textEdit: {
+                        range: {
+                          startLineNumber: edit.location.row,
+                          startColumn: edit.location.column,
+                          endLineNumber: edit.end_location.row,
+                          endColumn: edit.end_location.column,
                         },
+                        text: edit.content || "",
                       },
-                    ],
+                    })),
                   }
                 : undefined,
             }));
-          return { actions, dispose: () => {} };
+          return {
+            actions,
+            dispose: () => {},
+          };
         },
       },
     );
@@ -98,14 +103,22 @@ export default function SourceEditor({
     [onChange],
   );
 
+  const handleMount: BeforeMount = useCallback(
+    (instance) => (monacoRef.current = instance),
+    [],
+  );
+
   return (
     <Editor
+      beforeMount={handleMount}
       options={{
+        fixedOverflowWidgets: true,
         readOnly: false,
         minimap: { enabled: false },
         fontSize: 14,
         roundedSelection: false,
         scrollBeyondLastLine: false,
+        contextmenu: false,
       }}
       language={"python"}
       wrapperProps={visible ? {} : { style: { display: "none" } }}

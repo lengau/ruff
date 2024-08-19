@@ -1,15 +1,26 @@
 [package]
 name = "ruff_macros"
-version = "0.0.241"
-edition = "2021"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [lib]
 proc-macro = true
 doctest = false
 
 [dependencies]
-once_cell = { version = "1.17.0" }
-proc-macro2 = { version = "1.0.47" }
-quote = { version = "1.0.21" }
-syn = { version = "1.0.103", features = ["derive", "parsing", "extra-traits"] }
-textwrap = { version = "0.16.0" }
+ruff_python_trivia = { workspace = true }
+
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["derive", "parsing", "extra-traits", "full"] }
+itertools = { workspace = true }
+
+[lints]
+workspace = true

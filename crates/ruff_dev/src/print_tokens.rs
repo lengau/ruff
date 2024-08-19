@@ -1,23 +1,32 @@
 //! Print the token stream for a given Python file.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
-use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use rustpython_parser::lexer;
+
+use ruff_linter::source_kind::SourceKind;
+use ruff_python_ast::PySourceType;
+use ruff_python_parser::parse_unchecked_source;
 
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// Python file for which to generate the AST.
     #[arg(required = true)]
     file: PathBuf,
 }
 
-pub fn main(args: &Args) -> Result<()> {
-    let contents = fs::read_to_string(&args.file)?;
-    for (_, tok, _) in lexer::make_tokenizer(&contents).flatten() {
-        println!("{tok:#?}");
+pub(crate) fn main(args: &Args) -> Result<()> {
+    let source_type = PySourceType::from(&args.file);
+    let source_kind = SourceKind::from_path(&args.file, source_type)?.ok_or_else(|| {
+        anyhow::anyhow!(
+            "Could not determine source kind for file: {}",
+            args.file.display()
+        )
+    })?;
+    let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
+    for token in parsed.tokens() {
+        println!("{token:#?}");
     }
     Ok(())
 }

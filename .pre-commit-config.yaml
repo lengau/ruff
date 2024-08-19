@@ -1,44 +1,78 @@
+fail_fast: true
+
+exclude: |
+  (?x)^(
+    crates/red_knot_python_semantic/vendor/.*|
+    crates/red_knot_workspace/resources/.*|
+    crates/ruff_linter/resources/.*|
+    crates/ruff_linter/src/rules/.*/snapshots/.*|
+    crates/ruff_notebook/resources/.*|
+    crates/ruff_server/resources/.*|
+    crates/ruff/resources/.*|
+    crates/ruff_python_formatter/resources/.*|
+    crates/ruff_python_formatter/tests/snapshots/.*|
+    crates/ruff_python_resolver/resources/.*|
+    crates/ruff_python_resolver/tests/snapshots/.*
+  )$
+
 repos:
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.10.1
+    rev: v0.19
     hooks:
       - id: validate-pyproject
 
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.17
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-mkdocs
+          - mdformat-admon
+        exclude: |
+          (?x)^(
+            docs/formatter/black\.md
+            | docs/\w+\.md
+          )$
+
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.33.0
+    rev: v0.41.0
     hooks:
       - id: markdownlint-fix
-        args:
-          - --disable
-          - MD013 # line-length
-          - MD033 # no-inline-html
-          - --
+        exclude: |
+          (?x)^(
+            docs/formatter/black\.md
+            | docs/\w+\.md
+          )$
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.23.6
+    hooks:
+      - id: typos
 
   - repo: local
     hooks:
       - id: cargo-fmt
         name: cargo fmt
         entry: cargo fmt --
-        language: rust
+        language: system
         types: [rust]
-      - id: clippy
-        name: clippy
-        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
-        language: rust
-        pass_filenames: false
+        pass_filenames: false # This makes it a lot faster
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.1
+    hooks:
+      - id: ruff-format
       - id: ruff
-        name: ruff
-        entry: cargo run -- --no-cache --fix
-        language: rust
+        args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
         require_serial: true
-        exclude: ^crates/ruff/resources
-      - id: dev-generate-all
-        name: dev-generate-all
-        entry: cargo dev generate-all
-        language: rust
-        pass_filenames: false
-        exclude: target
+
+  # Prettier
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types: [yaml]
 
 ci:
-  skip: [cargo-fmt, clippy, dev-generate-all]
+  skip: [cargo-fmt, dev-generate-all]

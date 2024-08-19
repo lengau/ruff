@@ -1,6 +1,0 @@
----
-source: src/rules/flake8_logging_format/mod.rs
-expression: diagnostics
----
-[]
-

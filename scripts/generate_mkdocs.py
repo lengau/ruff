@@ -1,81 +1,218 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
-import argparse
-import shutil
-from pathlib import Path
 
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import shutil
+import subprocess
+from pathlib import Path
+from typing import NamedTuple, Sequence
+
+import mdformat
 import yaml
 
-SECTIONS: list[tuple[str, str]] = [
-    ("Overview", "index.md"),
-    ("Installation and Usage", "installation-and-usage.md"),
-    ("Configuration", "configuration.md"),
-    ("Rules", "rules.md"),
-    ("Settings", "settings.md"),
-    ("Editor Integrations", "editor-integrations.md"),
-    ("FAQ", "faq.md"),
+from _mdformat_utils import add_no_escape_text_plugin
+
+
+class Section(NamedTuple):
+    """A section to include in the MkDocs documentation."""
+
+    title: str
+    filename: str
+    generated: bool
+    # If subsections is present, the `filename` and `generated` value is unused.
+    subsections: Sequence[Section] | None = None
+
+
+SECTIONS: list[Section] = [
+    Section("Overview", "index.md", generated=True),
+    Section("Tutorial", "tutorial.md", generated=False),
+    Section("Installing Ruff", "installation.md", generated=False),
+    Section("The Ruff Linter", "linter.md", generated=False),
+    Section("The Ruff Formatter", "formatter.md", generated=False),
+    Section(
+        "Editors",
+        "",
+        generated=False,
+        subsections=[
+            Section("Editor Integration", "editors/index.md", generated=False),
+            Section("Setup", "editors/setup.md", generated=False),
+            Section("Features", "editors/features.md", generated=False),
+            Section("Settings", "editors/settings.md", generated=False),
+            Section("Migrating from ruff-lsp", "editors/migration.md", generated=False),
+        ],
+    ),
+    Section("Configuring Ruff", "configuration.md", generated=False),
+    Section("Preview", "preview.md", generated=False),
+    Section("Rules", "rules.md", generated=True),
+    Section("Settings", "settings.md", generated=True),
+    Section("Versioning", "versioning.md", generated=False),
+    Section("Integrations", "integrations.md", generated=False),
+    Section("FAQ", "faq.md", generated=False),
+    Section("Contributing", "contributing.md", generated=True),
 ]
 
-DOCUMENTATION_LINK: str = (
-    "This README is also available as [documentation](https://beta.ruff.rs/docs/)."
-)
 
-FATHOM_SCRIPT: str = (
-    '<script src="https://cdn.usefathom.com/script.js" data-site="DUAEBFLB" defer>'
-    "</script>"
-)
+LINK_REWRITES: dict[str, str] = {
+    "https://docs.astral.sh/ruff/": "index.md",
+    "https://docs.astral.sh/ruff/configuration/": "configuration.md",
+    "https://docs.astral.sh/ruff/configuration/#config-file-discovery": (
+        "configuration.md#config-file-discovery"
+    ),
+    "https://docs.astral.sh/ruff/contributing/": "contributing.md",
+    "https://docs.astral.sh/ruff/editors/setup": "editors/setup.md",
+    "https://docs.astral.sh/ruff/integrations/": "integrations.md",
+    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
+        "faq.md#how-does-ruffs-linter-compare-to-flake8"
+    ),
+    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black": (
+        "faq.md#how-does-ruffs-formatter-compare-to-black"
+    ),
+    "https://docs.astral.sh/ruff/installation/": "installation.md",
+    "https://docs.astral.sh/ruff/rules/": "rules.md",
+    "https://docs.astral.sh/ruff/settings/": "settings.md",
+    "#whos-using-ruff": "https://github.com/astral-sh/ruff#whos-using-ruff",
+}
+
+
+def clean_file_content(content: str, title: str) -> str:
+    """Add missing title, fix the header depth, and remove trailing empty lines."""
+    lines = content.splitlines()
+    if lines[0].startswith("# "):
+        return content
+
+    in_code_block = False
+    for i, line in enumerate(lines):
+        if line.startswith("```"):
+            in_code_block = not in_code_block
+        if not in_code_block and line.startswith("#"):
+            lines[i] = line[1:]
+
+    # Remove trailing empty lines.
+    for line in reversed(lines):
+        if line == "":
+            del lines[-1]
+        else:
+            break
+
+    content = "\n".join(lines) + "\n"
+
+    # Add a missing title.
+    return f"# {title}\n\n" + content
 
 
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
+    subprocess.run(["cargo", "dev", "generate-docs"], check=True)
+
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
 
-    # Remove the documentation link, since we're _in_ the docs.
-    if DOCUMENTATION_LINK not in content:
-        msg = "README.md is not in the expected format."
+    # Rewrite links to the documentation.
+    for src, dst in LINK_REWRITES.items():
+        before = content
+        after = content.replace(f"({src})", f"({dst})")
+        if before == after:
+            msg = f"Unexpected link rewrite in README.md: {src}"
+            raise ValueError(msg)
+        content = after
+
+    if m := re.search(r"\(https://docs.astral.sh/ruff/.*\)", content):
+        msg = f"Unexpected absolute link to documentation: {m.group(0)}"
         raise ValueError(msg)
-    content = content.replace(DOCUMENTATION_LINK, "")
 
     Path("docs").mkdir(parents=True, exist_ok=True)
 
     # Split the README.md into sections.
-    for title, filename in SECTIONS:
-        with Path(f"docs/{filename}").open("w+") as f:
-            block = content.split(f"<!-- Begin section: {title} -->")
-            if len(block) != 2:
-                msg = f"Section {title} not found in README.md"
-                raise ValueError(msg)
+    for title, filename, generated, _ in SECTIONS:
+        if not generated:
+            continue
 
-            block = block[1].split(f"<!-- End section: {title} -->")
-            if len(block) != 2:
-                msg = f"Section {title} not found in README.md"
-                raise ValueError(msg)
+        with Path(f"docs/{filename}").open("w+", encoding="utf8") as f:
+            if filename == "contributing.md":
+                # Copy the CONTRIBUTING.md.
+                shutil.copy("CONTRIBUTING.md", "docs/contributing.md")
+                continue
 
-            f.write(block[0])
+            if filename == "settings.md":
+                file_content = subprocess.check_output(
+                    ["cargo", "dev", "generate-options"],
+                    encoding="utf-8",
+                )
+            else:
+                block = content.split(f"<!-- Begin section: {title} -->\n\n")
+                if len(block) != 2:
+                    msg = f"Section {title} not found in README.md"
+                    raise ValueError(msg)
 
-    # Copy the CONTRIBUTING.md.
-    shutil.copy("CONTRIBUTING.md", "docs/contributing.md")
+                block = block[1].split(f"\n<!-- End section: {title} -->")
+                if len(block) != 2:
+                    msg = f"Section {title} not found in README.md"
+                    raise ValueError(msg)
 
-    # Add the nav section to mkdocs.yml.
+                file_content = block[0]
+
+                if filename == "rules.md":
+                    file_content += "\n" + subprocess.check_output(
+                        ["cargo", "dev", "generate-rules-table"],
+                        encoding="utf-8",
+                    )
+
+            f.write(clean_file_content(file_content, title))
+
+    # Format rules docs
+    add_no_escape_text_plugin()
+    for rule_doc in Path("docs/rules").glob("*.md"):
+        mdformat.file(rule_doc, extensions=["mkdocs", "admon", "no-escape-text"])
+
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)
-    config["nav"] = [
-        {"Overview": "index.md"},
-        {"Installation and Usage": "installation-and-usage.md"},
-        {"Configuration": "configuration.md"},
-        {"Rules": "rules.md"},
-        {"Settings": "settings.md"},
-        {"Editor Integrations": "editor-integrations.md"},
-        {"FAQ": "faq.md"},
-        {"Contributing": "contributing.md"},
-    ]
-    config["extra"] = {"analytics": {"provider": "fathom"}}
 
-    Path(".overrides/partials/integrations/analytics").mkdir(parents=True, exist_ok=True)
-    with Path(".overrides/partials/integrations/analytics/fathom.html").open("w+") as fp:
-        fp.write(FATHOM_SCRIPT)
+    # Add the redirect section to mkdocs.yml.
+    rules = json.loads(
+        subprocess.check_output(
+            [
+                "cargo",
+                "run",
+                "-p",
+                "ruff",
+                "--",
+                "rule",
+                "--all",
+                "--output-format",
+                "json",
+            ],
+        ),
+    )
+    config["plugins"].append(
+        {
+            "redirects": {
+                "redirect_maps": {
+                    f'rules/{rule["code"]}.md': f'rules/{rule["name"]}.md'
+                    for rule in rules
+                },
+            },
+        },
+    )
 
-    with Path("mkdocs.yml").open("w+") as fp:
+    # Add the nav section to mkdocs.yml.
+    config["nav"] = []
+    for section in SECTIONS:
+        if section.subsections is None:
+            config["nav"].append({section.title: section.filename})
+        else:
+            config["nav"].append(
+                {
+                    section.title: [
+                        {subsection.title: subsection.filename}
+                        for subsection in section.subsections
+                    ]
+                }
+            )
+
+    with Path("mkdocs.generated.yml").open("w+", encoding="utf8") as fp:
         yaml.safe_dump(config, fp)
 
 

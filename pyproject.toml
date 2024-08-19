@@ -1,16 +1,12 @@
 [build-system]
-requires = ["maturin>=0.14.10,<0.15"]
-# We depend on >=0.14.10 because we specify name in
-# [package.metadata.maturin] in ruff_cli/Cargo.toml.
-
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.241"
-description = "An extremely fast Python linter, written in Rust."
-authors = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
-maintainers = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
+version = "0.6.1"
+description = "An extremely fast Python linter and code formatter, written in Rust."
+authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
 license = { file = "LICENSE" }
@@ -23,7 +19,7 @@ keywords = [
   "clippy",
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
@@ -34,17 +30,84 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Rust",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Quality Assurance",
 ]
-urls = { repository = "https://github.com/charliermarsh/ruff" }
+
+[project.urls]
+Repository = "https://github.com/astral-sh/ruff"
+Documentation = "https://docs.astral.sh/ruff/"
+Changelog = "https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md"
 
 [tool.maturin]
 bindings = "bin"
-manifest-path = "crates/ruff_cli/Cargo.toml"
+manifest-path = "crates/ruff/Cargo.toml"
+module-name = "ruff"
 python-source = "python"
 strip = true
+exclude = [
+  "crates/ruff_linter/resources/test/fixtures/**/*",
+  "crates/ruff_linter/src/rules/*/snapshots/**/*"
+]
+include = [
+  "rust-toolchain.toml"
+]
 
-[tool.ruff.per-file-ignores]
-"setup.py" = ["INP001"]
+[tool.ruff]
+extend-exclude = [
+  "crates/red_knot_python_semantic/vendor/",
+  "crates/ruff/resources/",
+  "crates/ruff_linter/resources/",
+  "crates/ruff_python_formatter/resources/",
+  "crates/ruff_python_parser/resources/"
+]
+
+[tool.ruff.lint]
+ignore = [
+  # Conflicts with the formatter
+  "COM812", "ISC001"
+]
+
+[tool.black]
+force-exclude = '''
+/(
+  | crates/red_knot_python_semantic/vendor
+  | crates/ruff_linter/resources
+  | crates/ruff_python_formatter/resources
+  | crates/ruff_python_parser/resources
+)/
+'''
+
+[tool.rooster]
+major_labels = []  # Ruff never uses the major version number
+minor_labels = ["breaking"]   # Bump the minor version on breaking changes
+
+changelog_ignore_labels = ["internal", "ci", "red-knot"]
+
+changelog_sections.breaking = "Breaking changes"
+changelog_sections.preview = "Preview features"
+changelog_sections.rule = "Rule changes"
+changelog_sections.formatter = "Formatter"
+changelog_sections.server = "Server"
+changelog_sections.cli = "CLI"
+changelog_sections.configuration = "Configuration"
+changelog_sections.bug = "Bug fixes"
+changelog_sections.documentation = "Documentation"
+changelog_sections.__unknown__ = "Other changes"
+
+# We exclude contributors from the CHANGELOG file
+# Generate separately with `rooster contributors` for the GitHub release page
+changelog_contributors = false
+
+version_files = [
+  "README.md",
+  "docs/integrations.md",
+  "crates/ruff/Cargo.toml",
+  "crates/ruff_linter/Cargo.toml",
+  "crates/ruff_wasm/Cargo.toml",
+  "scripts/benchmarks/pyproject.toml",
+]

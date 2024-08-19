@@ -1,8 +1,11 @@
 site_name: Ruff
 theme:
   name: material
+  logo: assets/bolt.svg
+  favicon: assets/ruff-favicon.png
   features:
     - navigation.instant
+    - navigation.instant.prefetch
     - navigation.tracking
     - content.code.annotate
     - toc.integrate
@@ -10,26 +13,33 @@ theme:
     - navigation.path
     - navigation.top
     - content.code.copy
+    - content.tabs.link
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: red
+    # Note: Using the system theme works with the insiders version
+    # https://squidfunk.github.io/mkdocs-material/setup/changing-the-colors/#automatic-light-dark-mode
+    - media: "(prefers-color-scheme)"
       toggle:
-        icon: material/weather-sunny
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: astral-light
+      toggle:
+        icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: red
+      scheme: astral-dark
       toggle:
-        icon: material/weather-night
-        name: Switch to light mode
-  custom_dir: .overrides
-repo_url: https://github.com/charliermarsh/ruff
+        icon: material/brightness-4
+        name: Switch to system preference
+  custom_dir: docs/.overrides
+repo_url: https://github.com/astral-sh/ruff
 repo_name: ruff
 site_author: charliermarsh
-site_url: https://beta.ruff.rs/docs/
-site_dir: site/docs
+site_url: https://docs.astral.sh/ruff/
+site_dir: site/ruff
 markdown_extensions:
+  - admonition
+  - pymdownx.details
   - toc:
       permalink: "#"
   - pymdownx.snippets:
@@ -46,5 +56,18 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.highlight:
       anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
 plugins:
   - search
+  - typeset
+extra_css:
+  - stylesheets/extra.css
+extra_javascript:
+  - js/extra.js
+not_in_nav: |
+  /rules/*
+  /formatter/*
+extra:
+  analytics:
+    provider: fathom
